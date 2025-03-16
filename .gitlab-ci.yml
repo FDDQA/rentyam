@@ -1,0 +1,102 @@
+stages:
+  - build
+  - release
+
+variables:
+  PROD_DIR: /srv/listam_bot_prod
+  STAGE_DIR: /srv/listam_bot_stage
+  BOT_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}
+
+default:
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+
+build:
+  stage: build
+  script:
+    - docker build -t $BOT_IMAGE .
+    - docker push $BOT_IMAGE
+  only:
+    - master
+  tags:
+    - dev
+  when: manual
+
+stage-deploy:
+  stage: release
+  script:
+    - export BOT_TOKEN=$BOT_TOKEN_STAGE
+    - docker pull ${BOT_IMAGE}
+    - mkdir -p ${STAGE_DIR}
+    - rm -f ${STAGE_DIR}/docker-compose.yml
+    - cp docker-compose.stage.yml ${STAGE_DIR}/docker-compose.yml
+    - cd ${STAGE_DIR}
+    - docker-compose up -d
+    - sleep 10
+    - docker logs listam_bot_stage-bot-1
+  only:
+    - master
+  tags:
+    - stage
+  when: manual
+
+stage-stop:
+  stage: release
+  script:
+    - export BOT_TOKEN=$BOT_TOKEN_STAGE
+    - export MYSQL_DATABASE=$MYSQL_DATABASE_STAGE
+    - export MYSQL_USER=$MYSQL_USER_STAGE
+    - export MYSQL_PASSWORD=$MYSQL_PASSWORD_STAGE
+    - export MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD_STAGE
+    - export REDIS_HTTP_USER=$REDIS_HTTP_USER_STAGE
+    - export REDIS_HTTP_PASSWORD=$REDIS_PASSWORD_STAGE
+    - docker pull ${BOT_IMAGE}
+    - mkdir -p ${STAGE_DIR}
+    - rm -f ${STAGE_DIR}/docker-compose.yml
+    - cp docker-compose.prod.yml ${STAGE_DIR}/docker-compose.yml
+    - cd ${STAGE_DIR}
+    - docker-compose up -d
+    - sleep 10
+    - docker logs listam_bot_prod-bot-1
+    - cd ${STAGE_DIR}
+    - docker-compose down
+  only:
+    - master
+  tags:
+    - stage
+  when: manual
+
+prod-deploy:
+  stage: release
+  script:
+    - export BOT_TOKEN=$BOT_TOKEN_PROD
+    - export MYSQL_DATABASE=$MYSQL_DATABASE_PROD
+    - export MYSQL_USER=$MYSQL_USER_PROD
+    - export MYSQL_PASSWORD=$MYSQL_PASSWORD_PROD
+    - export MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD_PROD
+    - export REDIS_HTTP_USER=$REDIS_HTTP_USER_PROD
+    - export REDIS_HTTP_PASSWORD=$REDIS_PASSWORD_PROD
+    - docker pull ${BOT_IMAGE}
+    - mkdir -p ${PROD_DIR}
+    - rm -f ${PROD_DIR}/docker-compose.yml
+    - cp docker-compose.prod.yml ${PROD_DIR}/docker-compose.yml
+    - cd ${PROD_DIR}
+    - docker-compose up -d
+    - sleep 10
+    - docker logs listam_bot_prod-bot-1
+  only:
+    - master
+  tags:
+    - prod
+  when: manual
+
+prod-stop:
+  stage: release
+  script:
+    - cd ${PROD_DIR}
+    - docker-compose down
+  only:
+    - master
+  tags:
+    - prod
+  when: manual

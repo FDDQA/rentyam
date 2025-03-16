@@ -1,0 +1,50 @@
+version: '3.3'
+services:
+  db:
+    image: mysql:8.3.0
+    restart: always
+    environment:
+      MYSQL_DATABASE: $MYSQL_DATABASE_STAGE
+      MYSQL_USER: $MYSQL_USER_STAGE
+      MYSQL_PASSWORD: $MYSQL_PASSWORD_STAGE
+      MYSQL_ROOT_PASSWORD: $MYSQL_ROOT_PASSWORD_STAGE
+    ports:
+      - 3308:3306
+    volumes:
+      - ./db_data:/var/lib/mysql
+  redis:
+    image: redis:7.2.4
+    restart: always
+    command: bash -c "redis-server --appendonly yes"
+    ports:
+      - 6382:6379
+    volumes:
+        - ./redis-volume:/data
+  bot:
+    image: ${BOT_IMAGE}
+    restart: always
+    links:
+      - db
+      - redis
+    depends_on:
+      - db
+      - redis
+    environment:
+      BOT_TOKEN: $BOT_TOKEN_STAGE
+      DB_HOST: $MYSQL_HOST_STAGE
+      DB_PORT: 3306
+      DB_USER: $MYSQL_USER_STAGE
+      DB_PASSWORD: $MYSQL_PASSWORD_STAGE
+      DB_NAME: $MYSQL_DATABASE_STAGE
+      REDIS_HOST: $REDIS_HOST_STAGE
+      REDIS_PORT: 6379
+      REVIEW_URL: $REVIEW_URL_STAGE
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: always
+    environment:
+      - REDIS_HOST=$REDIS_HOST_STAGE
+      - HTTP_USER=$REDIS_HTTP_USER_STAGE
+      - HTTP_PASSWORD=$REDIS_PASSWORD_STAGE
+    ports:
+    - "8081:8081"
